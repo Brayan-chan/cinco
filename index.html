@@ -50,6 +50,17 @@
                                 <label for="classTime" class="form-label">Horario</label>
                                 <input type="text" id="classTime" class="form-control" placeholder="HH:MM-HH:MM">
                             </div>
+                            <div class="mb-3">
+                                <label for="classDay" class="form-label">Día de la Clase</label>
+                                <select id="classDay" class="form-select">
+                                    <option value="lunes">Lunes</option>
+                                    <option value="martes">Martes</option>
+                                    <option value="miércoles">Miércoles</option>
+                                    <option value="jueves">Jueves</option>
+                                    <option value="viernes">Viernes</option>
+                                </select>
+                            </div>
+                            
                             <!-- Campo oculto para almacenar el ID del evento -->
                             <input type="hidden" id="eventId">
                         </form>
@@ -91,6 +102,7 @@
                     document.getElementById('professorName').value = eventObj.title;
                     document.getElementById('subjectName').value = eventObj.extendedProps.subject;
                     document.getElementById('classTime').value = eventObj.start.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) + '-' + eventObj.end.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+                    document.getElementById('classDay').value = eventObj.extendedProps.day;
 
                     document.getElementById('eventId').value = eventObj.id;
 
@@ -150,7 +162,8 @@
                             start: startDate,
                             end: endDate,
                             extendedProps: {
-                                subject: materia
+                                subject: materia,
+                                day: diaSemana
                             },
                             backgroundColor: professorColors[profesor],
                             borderColor: professorColors[profesor]
@@ -163,28 +176,57 @@
             document.getElementById('saveChanges').addEventListener('click', function () {
                 var eventId = document.getElementById('eventId').value;
                 var selectedEvent = calendar.getEventById(eventId);
-    
+            
                 if (selectedEvent) {
-                    selectedEvent.setProp('title', document.getElementById('professorName').value);
-                    selectedEvent.setExtendedProp('subject', document.getElementById('subjectName').value);
-    
+                    var newTitle = document.getElementById('professorName').value;
+                    var newSubject = document.getElementById('subjectName').value;
                     var timeRange = document.getElementById('classTime').value.split('-');
                     var newStartTime = timeRange[0].trim().split(':');
                     var newEndTime = timeRange[1].trim().split(':');
-    
-                    var newStart = new Date(selectedEvent.start);
-                    newStart.setHours(parseInt(newStartTime[0]), parseInt(newStartTime[1]));
-    
-                    var newEnd = new Date(selectedEvent.end);
-                    newEnd.setHours(parseInt(newEndTime[0]), parseInt(newEndTime[1]));
-    
-                    selectedEvent.setStart(newStart);
-                    selectedEvent.setEnd(newEnd);
-    
-                    var modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
-                    modal.hide();
+                    var newDay = new Date(selectedEvent.start);
+            
+                    // Obtener el nuevo día de la semana
+                    var dayMap = {
+                        "lunes": 1,
+                        "martes": 2,
+                        "miércoles": 3,
+                        "jueves": 4,
+                        "viernes": 5
+                    };
+            
+                    var selectedDay = document.getElementById('classDay').value.toLowerCase();
+                    var newDayOfWeek = dayMap[selectedDay];
+                    var currentDayOfWeek = (newDay.getDay() + 6) % 7 + 1; // Convertir de domingo a lunes basado en 1-7
+            
+                    // Ajustar la fecha al nuevo día seleccionado
+                    var dayDifference = newDayOfWeek - currentDayOfWeek;
+                    newDay.setDate(newDay.getDate() + dayDifference);
+            
+                    // Ajustar la hora de inicio
+                    newDay.setHours(newStartTime[0]);
+                    newDay.setMinutes(newStartTime[1]);
+            
+                    var newEndDay = new Date(newDay);
+                    newEndDay.setHours(newEndTime[0]);
+                    newEndDay.setMinutes(newEndTime[1]);
+            
+                    selectedEvent.setProp('title', newTitle);
+                    selectedEvent.setExtendedProp('subject', newSubject);
+                    selectedEvent.setStart(newDay);
+                    selectedEvent.setEnd(newEndDay);
+                    selectedEvent.setExtendedProp('day', selectedDay);
+            
+                    // Actualizar el color del evento si el profesor ha cambiado
+                    if (professorColors[newTitle] && professorColors[newTitle] !== selectedEvent.backgroundColor) {
+                        selectedEvent.setProp('backgroundColor', professorColors[newTitle]);
+                        selectedEvent.setProp('borderColor', professorColors[newTitle]);
+                    }
                 }
+            
+                var modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
+                modal.hide();
             });
+                      
 
             // Función para generar y descargar el PDF
             document.getElementById('downloadPdfBtn').addEventListener('click', function () {
@@ -194,14 +236,15 @@
                     return {
                         Profesor: event.title,
                         Materia: event.extendedProps.subject,
+                        Día: event.extendedProps.day,
                         Inicio: event.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         Fin: event.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                     };
                 });
 
                 doc.autoTable({
-                    head: [['Profesor', 'Materia', 'Inicio', 'Fin']],
-                    body: events.map(e => [e.Profesor, e.Materia, e.Inicio, e.Fin]),
+                    head: [['Profesor', 'Materia', 'Día', 'Inicio', 'Fin']],
+                    body: events.map(e => [e.Profesor, e.Materia, e.Día, e.Inicio, e.Fin]),
                     margin: { top: 10 },
                     styles: {
                         fontSize: 10,
