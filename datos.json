@@ -1,0 +1,8 @@
+[
+    {"profesor": "Aguilar Pavon Melissa", "materia": "Inglés 1", "dia": "n/a", "horario": "09:00-11:00", "tipoProfesor": "Contrato"},
+    {"profesor": "Avila Ortega Isabel", "materia": "Cálculo Diferencial", "dia": "n/a", "horario": "11:00-13:00", "tipoProfesor": "Contrato"},
+    {"profesor": "Chavez Molina Jose Manuel", "materia": "Inglés 5", "dia": "n/a", "horario": "07:00-09:00", "tipoProfesor": "Contrato"},
+    {"profesor": "Tun Salazar Sergio", "materia": "Metodologia", "dia": "jueves", "horario": "16:00-18:00", "tipoProfesor": "Tiempo Completo"},
+    {"profesor": "Justino Ramirez Ortegon", "materia": "Graficacion", "dia": "Lunes", "horario": "07:00-09:00", "tipoProfesor": "Tiempo Completo"},
+    {"profesor": "Heribe Uribe Santiago", "materia": "Bases de datos 1", "dia": "Jueves", "horario": "07:00-09:00", "tipoProfesor": "Tiempo Completo"}
+]

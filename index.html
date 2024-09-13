@@ -84,7 +84,8 @@
         document.addEventListener('DOMContentLoaded', function () {
             var calendarEl = document.getElementById('calendar');
             var professorColors = {}; // Mapa para almacenar el color asignado a cada profesor
-        
+            var profesorMaterias = {}; // Contador de materias por profesor
+    
             function getRandomColor() {
                 var letters = '0123456789ABCDEF';
                 var color = '#';
@@ -93,108 +94,146 @@
                 }
                 return color;
             }
-        
+    
+            // Algoritmo de backtracking mejorado para evitar solapamientos
+            function asignarDiaBacktracking(profesor, horaInicio, horaFin, diasDisponibles, eventosExistentes) {
+                function esValido(dia, startDate, endDate) {
+                    // Verificar si el evento choca con algún otro evento en el mismo día
+                    return !eventosExistentes.some(event => {
+                        return event.extendedProps.professor === profesor && event.start.getDay() === dia &&
+                            (startDate < event.end && endDate > event.start);
+                    });
+                }
+    
+                for (let dia of diasDisponibles) {
+                    var startDate = new Date();
+                    startDate.setDate(startDate.getDate() + (dia - startDate.getDay()));
+                    startDate.setHours(parseInt(horaInicio[0]), parseInt(horaInicio[1]), 0);
+    
+                    var endDate = new Date(startDate);
+                    endDate.setHours(parseInt(horaFin[0]), parseInt(horaFin[1]), 0);
+    
+                    if (esValido(dia, startDate, endDate)) {
+                        return { diaAsignado: dia, startDate, endDate };
+                    }
+                }
+    
+                return null;
+            }
+    
             var calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'timeGridWeek',
                 locale: 'es',
                 firstDay: 1,
-                hiddenDays: [0, 6],
+                hiddenDays: [0, 6], // Oculta Sábado y Domingo
                 editable: true,
                 events: [],
-        
                 eventClick: function (info) {
-                    var eventObj = info.event;
-        
-                    document.getElementById('professorName').value = eventObj.title;
-                    document.getElementById('subjectName').value = eventObj.extendedProps.subject;
-                    document.getElementById('classTime').value = eventObj.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + '-' + eventObj.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                    document.getElementById('classDay').value = eventObj.extendedProps.day;
-                    document.getElementById('professorType').value = eventObj.extendedProps.type; // Añadido para el tipo de profesor
-        
-                    document.getElementById('eventId').value = eventObj.id;
-        
-                    var modal = new bootstrap.Modal(document.getElementById('editModal'));
-                    modal.show();
+                    // Abrir modal con la información del evento seleccionado
+                    var selectedEvent = info.event;
+                    document.getElementById('eventId').value = selectedEvent.id;
+                    document.getElementById('professorName').value = selectedEvent.title;
+                    document.getElementById('subjectName').value = selectedEvent.extendedProps.subject;
+                    document.getElementById('classTime').value = selectedEvent.start.toTimeString().slice(0, 5) + ' - ' + selectedEvent.end.toTimeString().slice(0, 5);
+                    document.getElementById('classDay').value = selectedEvent.extendedProps.day;
+                    document.getElementById('professorType').value = selectedEvent.extendedProps.type;
+    
+                    // Mostrar modal
+                    var editModal = new bootstrap.Modal(document.getElementById('editModal'));
+                    editModal.show();
                 }
             });
             calendar.render();
-        
-            document.getElementById('importBtn').addEventListener('click', function () {
-                var fileInput = document.getElementById('excelFile');
-                if (fileInput.files.length === 0) {
-                    return; 
-                }
-                var file = fileInput.files[0];
-                var reader = new FileReader();
-                reader.onload = function (e) {
-                    var data = new Uint8Array(e.target.result);
-                    var workbook = XLSX.read(data, { type: 'array' });
-                    var firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                    var rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-        
-                    rows.forEach(function (row, index) {
-                        if (index === 0) return; 
-                        var profesor = row[0];
-                        var materia = row[1];
-                        var diaSemana = row[2];
-                        var horario = row[3].split('-');
-                        var horaInicio = horario[0].trim();
-                        var horaFin = horario[1].trim();
-                        var tipoProfesor = row[4]; // Obtener el tipo de profesor
-        
-                        var diasMap = {
-                            "lunes": 1,
-                            "martes": 2,
-                            "miércoles": 3,
-                            "jueves": 4,
-                            "viernes": 5
-                        };
-        
-                        var startDate = new Date();
-                        startDate.setDate(startDate.getDate() + (diasMap[diaSemana.toLowerCase()] - startDate.getDay()));
-        
-                        var startTime = horaInicio.split(":");
-                        startDate.setHours(startTime[0], startTime[1]);
-        
-                        var endDate = new Date(startDate);
-                        var endTime = horaFin.split(":");
-                        endDate.setHours(endTime[0], endTime[1]);
-        
-                        if (!professorColors[profesor]) {
-                            professorColors[profesor] = getRandomColor();
-                        }
-        
-                        calendar.addEvent({
-                            id: 'event-' + index,
-                            title: profesor,
-                            start: startDate,
-                            end: endDate,
-                            extendedProps: {
-                                subject: materia,
-                                day: diaSemana,
-                                type: tipoProfesor // Añadido para el tipo de profesor
-                            },
-                            backgroundColor: professorColors[profesor],
-                            borderColor: professorColors[profesor]
-                        });
-                    });
-                };
-                reader.readAsArrayBuffer(file);
+    
+            // Cargar datos desde JSON
+            fetch('datos.json').then(response => response.json()).then(data => {
+                // Procesar primero los profesores de tiempo completo
+                data.filter(event => event.tipoProfesor === "Tiempo Completo").forEach(addEvent);
+                // Luego procesar los profesores de contrato
+                data.filter(event => event.tipoProfesor === "Contrato").forEach(addEvent);
             });
-        
+    
+            function addEvent(event) {
+                var profesor = event.profesor;
+                var materia = event.materia;
+                var diaSemana = event.dia;
+                var horario = event.horario.split('-');
+                var horaInicio = horario[0].trim().split(':');
+                var horaFin = horario[1].trim().split(':');
+            
+                // Generar ID único si no existe
+                if (!event.id) {
+                    event.id = profesor + '-' + materia + '-' + diaSemana + '-' + Math.random().toString(36).substr(2, 9);
+                }
+            
+                if (profesorMaterias[profesor] >= 4) {
+                    console.error('El profesor ya tiene 4 materias asignadas. Ignorando clase:', profesor);
+                    return;
+                }
+            
+                profesorMaterias[profesor] = (profesorMaterias[profesor] || 0) + 1;
+            
+                // Asignar día y hora usando backtracking si no hay un día específico
+                if (diaSemana.toLowerCase() === 'n/a') {
+                    var diasDisponibles = [1, 2, 3, 4, 5]; // Lunes a Viernes
+                    var resultado = asignarDiaBacktracking(profesor, horaInicio, horaFin, diasDisponibles, calendar.getEvents());
+            
+                    if (!resultado) {
+                        console.error('No se pudo asignar un horario disponible para el profesor:', profesor);
+                        return;
+                    }
+            
+                    diaSemana = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes'][resultado.diaAsignado - 1];
+                }
+            
+                // Crear el evento en el calendario
+                var diasMap = {
+                    "lunes": 1, "martes": 2, "miércoles": 3, "jueves": 4, "viernes": 5
+                };
+                var startDate = new Date();
+                var endDate = new Date();
+                startDate.setDate(startDate.getDate() + (diasMap[diaSemana.toLowerCase()] - startDate.getDay()));
+                endDate.setDate(endDate.getDate() + (diasMap[diaSemana.toLowerCase()] - endDate.getDay()));
+                startDate.setHours(parseInt(horaInicio[0]), parseInt(horaInicio[1]), 0);
+                endDate.setHours(parseInt(horaFin[0]), parseInt(horaFin[1]), 0);
+            
+                if (!professorColors[profesor]) {
+                    professorColors[profesor] = getRandomColor();
+                }
+            
+                // Verificar si el evento ya existe para evitar duplicados
+                var existingEvent = calendar.getEventById(event.id);
+                if (!existingEvent) {
+                    calendar.addEvent({
+                        id: event.id,
+                        title: profesor,
+                        start: startDate,
+                        end: endDate,
+                        extendedProps: {
+                            subject: materia,
+                            day: diaSemana,
+                            type: event.tipoProfesor
+                        },
+                        backgroundColor: professorColors[profesor],
+                        borderColor: professorColors[profesor]
+                    });
+                }
+            }
+            
+
+            // Guardar cambios en el modal
             document.getElementById('saveChanges').addEventListener('click', function () {
                 var eventId = document.getElementById('eventId').value;
-                var selectedEvent = calendar.getEventById(eventId);
-            
+                var selectedEvent = calendar.getEventById(eventId); // Recupera el evento existente por ID
+    
                 if (selectedEvent) {
                     var newTitle = document.getElementById('professorName').value;
                     var newSubject = document.getElementById('subjectName').value;
                     var timeRange = document.getElementById('classTime').value.split('-');
                     var newStartTime = timeRange[0].trim().split(':');
                     var newEndTime = timeRange[1].trim().split(':');
-                    var newDay = new Date(selectedEvent.start);
-            
-                    // Obtener el nuevo día de la semana
+                    var newDay = new Date(selectedEvent.start); // Cambiamos el día pero conservamos la referencia
+    
                     var dayMap = {
                         "lunes": 1,
                         "martes": 2,
@@ -202,44 +241,40 @@
                         "jueves": 4,
                         "viernes": 5
                     };
-            
+    
                     var selectedDay = document.getElementById('classDay').value.toLowerCase();
                     var newDayOfWeek = dayMap[selectedDay];
-                    var currentDayOfWeek = (newDay.getDay() + 6) % 7 + 1; // Convertir de domingo a lunes basado en 1-7
-            
-                    // Ajustar la fecha al nuevo día seleccionado
+                    var currentDayOfWeek = (newDay.getDay() + 6) % 7 + 1; // Normalizamos el valor del día
+    
                     var dayDifference = newDayOfWeek - currentDayOfWeek;
-                    newDay.setDate(newDay.getDate() + dayDifference);
-            
-                    // Ajustar la hora de inicio
-                    newDay.setHours(newStartTime[0]);
-                    newDay.setMinutes(newStartTime[1]);
-            
+                    newDay.setDate(newDay.getDate() + dayDifference); // Ajustamos el nuevo día
+    
+                    newDay.setHours(newStartTime[0], newStartTime[1]);
+    
                     var newEndDay = new Date(newDay);
-                    newEndDay.setHours(newEndTime[0]);
-                    newEndDay.setMinutes(newEndTime[1]);
-            
+                    newEndDay.setHours(newEndTime[0], newEndTime[1]);
+    
+                    // Actualizamos las propiedades del evento en el calendario
                     selectedEvent.setProp('title', newTitle);
                     selectedEvent.setExtendedProp('subject', newSubject);
                     selectedEvent.setStart(newDay);
                     selectedEvent.setEnd(newEndDay);
                     selectedEvent.setExtendedProp('day', selectedDay);
-                    selectedEvent.setExtendedProp('type', document.getElementById('professorType').value); // Actualizar el tipo de profesor
-            
-                    // Actualizar el color del evento si el profesor ha cambiado
+                    selectedEvent.setExtendedProp('type', document.getElementById('professorType').value);
+    
+                    // Cambiar el color si el nombre del profesor cambia
                     if (professorColors[newTitle] && professorColors[newTitle] !== selectedEvent.backgroundColor) {
                         selectedEvent.setProp('backgroundColor', professorColors[newTitle]);
                         selectedEvent.setProp('borderColor', professorColors[newTitle]);
                     }
                 }
-            
+    
                 var modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
                 modal.hide();
             });
-            
-            // Función para generar y descargar el PDF
+    
+            // Generar PDF con los eventos
             document.getElementById('downloadPdfBtn').addEventListener('click', function () {
-                var { jsPDF } = window.jspdf;
                 var doc = new jsPDF();
                 var events = calendar.getEvents().map(event => {
                     return {
@@ -248,24 +283,18 @@
                         Día: event.extendedProps.day,
                         Inicio: event.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                         Fin: event.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        Tipo: event.extendedProps.type // Añadido para el tipo de profesor
+                        Tipo: event.extendedProps.type
                     };
                 });
-        
-                doc.autoTable({
-                    head: [['Profesor', 'Materia', 'Día', 'Inicio', 'Fin', 'Tipo']], // Añadido 'Tipo'
-                    body: events.map(e => [e.Profesor, e.Materia, e.Día, e.Inicio, e.Fin, e.Tipo]), // Añadido 'Tipo'
-                    margin: { top: 10 },
-                    styles: {
-                        fontSize: 10,
-                        cellPadding: 3
-                    }
-                });
-        
+    
+                var columns = ['Profesor', 'Materia', 'Día', 'Inicio', 'Fin', 'Tipo'];
+                var rows = events.map(e => [e.Profesor, e.Materia, e.Día, e.Inicio, e.Fin, e.Tipo]);
+    
+                doc.autoTable(columns, rows);
                 doc.save('horarios.pdf');
             });
-        });        
-    </script>
+        });
+    </script>    
 
     <!-- Scripts de Bootstrap -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
