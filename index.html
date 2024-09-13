@@ -57,29 +57,37 @@
     </div>
 
     <script>
-        // Configuración del calendario
         document.addEventListener('DOMContentLoaded', function () {
             var calendarEl = document.getElementById('calendar');
+            var professorColors = {}; // Mapa para almacenar el color asignado a cada profesor
+
+            // Función para generar un color aleatorio
+            function getRandomColor() {
+                var letters = '0123456789ABCDEF';
+                var color = '#';
+                for (var i = 0; i < 6; i++) {
+                    color += letters[Math.floor(Math.random() * 16)];
+                }
+                return color;
+            }
+
             var calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'timeGridWeek',
-                locale: 'es',  // Calendario en español
-                firstDay: 1,   // Lunes como primer día
-                hiddenDays: [0, 6], // Ocultar domingo y sábado
+                locale: 'es',
+                firstDay: 1,
+                hiddenDays: [0, 6],
                 editable: true,
-                events: [], // Los eventos serán añadidos aquí tras importar el Excel
+                events: [],
+
                 eventClick: function (info) {
-                    // Abrir el modal para editar la información del profesor
                     var eventObj = info.event;
 
-                    // Asignar los valores actuales al formulario
                     document.getElementById('professorName').value = eventObj.title;
                     document.getElementById('subjectName').value = eventObj.extendedProps.subject;
                     document.getElementById('classTime').value = eventObj.start.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'}) + '-' + eventObj.end.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
 
-                    // Asignar el ID del evento al campo oculto
                     document.getElementById('eventId').value = eventObj.id;
 
-                    // Mostrar el modal
                     var modal = new bootstrap.Modal(document.getElementById('editModal'));
                     modal.show();
                 }
@@ -90,7 +98,7 @@
             document.getElementById('importBtn').addEventListener('click', function () {
                 var fileInput = document.getElementById('excelFile');
                 if (fileInput.files.length === 0) {
-                    return; // No se muestra alerta
+                    return; 
                 }
                 var file = fileInput.files[0];
                 var reader = new FileReader();
@@ -100,13 +108,12 @@
                     var firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                     var rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
 
-                    // Parsear los datos del Excel y añadirlos al calendario
                     rows.forEach(function (row, index) {
-                        if (index === 0) return; // Saltar encabezado
+                        if (index === 0) return; 
                         var profesor = row[0];
                         var materia = row[1];
-                        var diaSemana = row[2]; // Días de la semana
-                        var horario = row[3].split('-'); // Formato HH:MM-HH:MM
+                        var diaSemana = row[2]; 
+                        var horario = row[3].split('-'); 
                         var horaInicio = horario[0].trim();
                         var horaFin = horario[1].trim();
 
@@ -128,21 +135,27 @@
                         var endTime = horaFin.split(":");
                         endDate.setHours(endTime[0], endTime[1]);
 
+                        // Asignar color al profesor si no tiene uno asignado
+                        if (!professorColors[profesor]) {
+                            professorColors[profesor] = getRandomColor();
+                        }
+
                         calendar.addEvent({
-                            id: 'event-' + index, // Asignar un ID único a cada evento
+                            id: 'event-' + index,
                             title: profesor,
                             start: startDate,
                             end: endDate,
                             extendedProps: {
                                 subject: materia
-                            }
+                            },
+                            backgroundColor: professorColors[profesor], // Asignar color al evento
+                            borderColor: professorColors[profesor]
                         });
                     });
                 };
                 reader.readAsArrayBuffer(file);
             });
 
-            // Guardar cambios y cerrar modal
             document.getElementById('saveChanges').addEventListener('click', function () {
                 var eventId = document.getElementById('eventId').value;
                 var selectedEvent = calendar.getEventById(eventId);
