@@ -144,33 +144,29 @@
 
             // Guardar cambios y cerrar modal
             document.getElementById('saveChanges').addEventListener('click', function () {
-                var eventId = document.getElementById('eventId').value; // Obtener el ID del evento
-
-                if (eventId) {
-                    var selectedEvent = calendar.getEventById(eventId); // Obtener el evento por su ID
-                    if (selectedEvent) {
-                        // Actualizar título y propiedades extendidas del evento
-                        selectedEvent.setProp('title', document.getElementById('professorName').value);
-                        selectedEvent.setExtendedProp('subject', document.getElementById('subjectName').value);
-                        
-                        var timeRange = document.getElementById('classTime').value.split('-');
-                        var newStartTime = timeRange[0].trim().split(':');
-                        var newEndTime = timeRange[1].trim().split(':');
-
-                        var newStart = new Date(selectedEvent.start);
-                        newStart.setHours(newStartTime[0], newStartTime[1]);
-
-                        var newEnd = new Date(selectedEvent.end);
-                        newEnd.setHours(newEndTime[0], newEndTime[1]);
-
-                        selectedEvent.setStart(newStart);
-                        selectedEvent.setEnd(newEnd);
-                    }
+                var eventId = document.getElementById('eventId').value;
+                var selectedEvent = calendar.getEventById(eventId);
+    
+                if (selectedEvent) {
+                    selectedEvent.setProp('title', document.getElementById('professorName').value);
+                    selectedEvent.setExtendedProp('subject', document.getElementById('subjectName').value);
+    
+                    var timeRange = document.getElementById('classTime').value.split('-');
+                    var newStartTime = timeRange[0].trim().split(':');
+                    var newEndTime = timeRange[1].trim().split(':');
+    
+                    var newStart = new Date(selectedEvent.start);
+                    newStart.setHours(parseInt(newStartTime[0]), parseInt(newStartTime[1]));
+    
+                    var newEnd = new Date(selectedEvent.end);
+                    newEnd.setHours(parseInt(newEndTime[0]), parseInt(newEndTime[1]));
+    
+                    selectedEvent.setStart(newStart);
+                    selectedEvent.setEnd(newEnd);
+    
+                    var modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
+                    modal.hide();
                 }
-
-                // Cerrar el modal
-                var modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
-                modal.hide();
             });
         });
     </script>
