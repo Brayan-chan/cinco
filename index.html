@@ -96,54 +96,109 @@
             }
     
             // Algoritmo de backtracking mejorado para evitar solapamientos
-            function asignarDiaBacktracking(profesor, horaInicio, horaFin, diasDisponibles, eventosExistentes) {
-                function esValido(dia, startDate, endDate) {
-                    // Verificar si el evento choca con algún otro evento en el mismo día
-                    return !eventosExistentes.some(event => {
-                        return event.extendedProps.professor === profesor && event.start.getDay() === dia &&
-                            (startDate < event.end && endDate > event.start);
-                    });
-                }
-    
-                for (let dia of diasDisponibles) {
-                    var startDate = new Date();
-                    startDate.setDate(startDate.getDate() + (dia - startDate.getDay()));
-                    startDate.setHours(parseInt(horaInicio[0]), parseInt(horaInicio[1]), 0);
-    
-                    var endDate = new Date(startDate);
-                    endDate.setHours(parseInt(horaFin[0]), parseInt(horaFin[1]), 0);
-    
-                    if (esValido(dia, startDate, endDate)) {
-                        return { diaAsignado: dia, startDate, endDate };
-                    }
-                }
-    
-                return null;
-            }
-    
-            var calendar = new FullCalendar.Calendar(calendarEl, {
-                initialView: 'timeGridWeek',
-                locale: 'es',
-                firstDay: 1,
-                hiddenDays: [0, 6], // Oculta Sábado y Domingo
-                editable: true,
-                events: [],
-                eventClick: function (info) {
-                    // Abrir modal con la información del evento seleccionado
-                    var selectedEvent = info.event;
-                    document.getElementById('eventId').value = selectedEvent.id;
-                    document.getElementById('professorName').value = selectedEvent.title;
-                    document.getElementById('subjectName').value = selectedEvent.extendedProps.subject;
-                    document.getElementById('classTime').value = selectedEvent.start.toTimeString().slice(0, 5) + ' - ' + selectedEvent.end.toTimeString().slice(0, 5);
-                    document.getElementById('classDay').value = selectedEvent.extendedProps.day;
-                    document.getElementById('professorType').value = selectedEvent.extendedProps.type;
-    
-                    // Mostrar modal
-                    var editModal = new bootstrap.Modal(document.getElementById('editModal'));
-                    editModal.show();
-                }
-            });
-            calendar.render();
+// Algoritmo de backtracking mejorado para evitar solapamientos
+function asignarDiaBacktracking(profesor, horaInicio, horaFin, diasDisponibles, eventosExistentes) {
+    function esValido(dia, startDate, endDate) {
+        // Verificar si el evento choca con algún otro evento en el mismo día
+        return !eventosExistentes.some(event => {
+            return event.extendedProps.professor === profesor && event.start.getDay() === dia &&
+                (startDate < event.end && endDate > event.start);
+        });
+    }
+
+    for (let dia of diasDisponibles) {
+        var startDate = new Date();
+        startDate.setDate(startDate.getDate() + (dia - startDate.getDay()));
+        startDate.setHours(parseInt(horaInicio[0]), parseInt(horaInicio[1]), 0);
+
+        var endDate = new Date(startDate);
+        endDate.setHours(parseInt(horaFin[0]), parseInt(horaFin[1]), 0);
+
+        if (esValido(dia, startDate, endDate)) {
+            return { diaAsignado: dia, startDate, endDate };
+        }
+    }
+
+    return null;
+}
+
+// Algoritmo Genético para optimizar horarios
+function algoritmoGenetico(eventos) {
+    // Generar población inicial
+    function generarPoblacionInicial(numIndividuos) {
+        let poblacion = [];
+        for (let i = 0; i < numIndividuos; i++) {
+            // Crear individuos con horarios aleatorios
+            poblacion.push(generarHorarioAleatorio(eventos));
+        }
+        return poblacion;
+    }
+
+    // Evaluar fitness
+    function evaluarFitness(individuo) {
+        // Penalizar horarios que no cumplen con las restricciones
+        return calcularPenalizacion(individuo);
+    }
+
+    // Cruzar dos individuos
+    function cruzar(individuo1, individuo2) {
+        // Implementar cruce
+        return combinarHorarios(individuo1, individuo2);
+    }
+
+    // Mutar un individuo
+    function mutar(individuo) {
+        // Implementar mutación
+        return alterarHorario(individuo);
+    }
+
+    // Parámetros del algoritmo genético
+    let numGeneraciones = 100;
+    let poblacion = generarPoblacionInicial(100);
+
+    for (let generacion = 0; generacion < numGeneraciones; generacion++) {
+        poblacion = poblacion.map(ind => {
+            let fitness = evaluarFitness(ind);
+            return { individuo: ind, fitness };
+        }).sort((a, b) => a.fitness - b.fitness); // Ordenar por fitness
+
+        let nuevaPoblacion = [];
+        for (let i = 0; i < poblacion.length; i += 2) {
+            let padre1 = poblacion[i].individuo;
+            let padre2 = poblacion[i + 1].individuo;
+            let hijo1 = cruzar(padre1, padre2);
+            let hijo2 = cruzar(padre2, padre1);
+            nuevaPoblacion.push(mutar(hijo1), mutar(hijo2));
+        }
+        poblacion = nuevaPoblacion;
+    }
+
+    return poblacion[0].individuo; // Mejor solución encontrada
+}
+
+var calendar = new FullCalendar.Calendar(calendarEl, {
+    initialView: 'timeGridWeek',
+    locale: 'es',
+    firstDay: 1,
+    hiddenDays: [0, 6], // Oculta Sábado y Domingo
+    editable: true,
+    events: [],
+    eventClick: function (info) {
+        // Abrir modal con la información del evento seleccionado
+        var selectedEvent = info.event;
+        document.getElementById('eventId').value = selectedEvent.id;
+        document.getElementById('professorName').value = selectedEvent.title;
+        document.getElementById('subjectName').value = selectedEvent.extendedProps.subject;
+        document.getElementById('classTime').value = selectedEvent.start.toTimeString().slice(0, 5) + ' - ' + selectedEvent.end.toTimeString().slice(0, 5);
+        document.getElementById('classDay').value = selectedEvent.extendedProps.day;
+        document.getElementById('professorType').value = selectedEvent.extendedProps.type;
+
+        // Mostrar modal
+        var editModal = new bootstrap.Modal(document.getElementById('editModal'));
+        editModal.show();
+    }
+});
+calendar.render();
     
             // Cargar datos desde JSON
             fetch('datos.json').then(response => response.json()).then(data => {
