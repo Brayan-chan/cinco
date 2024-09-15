@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,22 +8,18 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.7/index.global.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.3/jspdf.plugin.autotable.min.js" integrity="sha512-CNhbAXGrvqmSMpgydAOp7SFP50hdDaIMir76cuptjMdG0V4Hq7h+JzpSudrD2mRC38tawkA8aQSU8dQ0H6hzdQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+
 </head>
+
 <body class="bg-gray-100">
     <div class="container py-5">
-        <h1 class="text-center mb-5">Horario de la Facultad</h1>
-
-        <!-- Botón de importar archivo -->
-        <div class="text-center mb-3">
-            <input type="file" id="excelFile" class="form-control-file">
-            <button id="importBtn" class="btn btn-primary mt-3">Importar Archivo Excel</button>
-        </div>
+        <h1 class="text-center mb-4">Horario de la Facultad</h1>
 
         <!-- Botón de descarga PDF -->
         <div class="text-center mb-3">
-            <button id="downloadPdfBtn" class="btn btn-secondary mt-3">Descargar PDF</button>
+            <button id="downloadPdfBtn" class="btn btn-primary mt-3">Generar horario</button>
         </div>
 
         <!-- Contenedor para el calendario -->
@@ -85,7 +82,7 @@
             var calendarEl = document.getElementById('calendar');
             var professorColors = {}; // Mapa para almacenar el color asignado a cada profesor
             var profesorMaterias = {}; // Contador de materias por profesor
-    
+
             function getRandomColor() {
                 var letters = '0123456789ABCDEF';
                 var color = '#';
@@ -94,112 +91,116 @@
                 }
                 return color;
             }
-    
+
             // Algoritmo de backtracking mejorado para evitar solapamientos
-// Algoritmo de backtracking mejorado para evitar solapamientos
-function asignarDiaBacktracking(profesor, horaInicio, horaFin, diasDisponibles, eventosExistentes) {
-    function esValido(dia, startDate, endDate) {
-        // Verificar si el evento choca con algún otro evento en el mismo día
-        return !eventosExistentes.some(event => {
-            return event.extendedProps.professor === profesor && event.start.getDay() === dia &&
-                (startDate < event.end && endDate > event.start);
-        });
-    }
+            function asignarDiaBacktracking(profesor, horaInicio, horaFin, diasDisponibles, eventosExistentes) {
+                // Verificar si un horario es válido para un día y no se solapa con eventos existentes
+                function esValido(dia, startDate, endDate, eventosExistentes) {
+                    // Verificar si el evento choca con cualquier otro evento en cualquier día
+                    return !eventosExistentes.some(event => {
+                        const mismoDia = event.start.getDay() === dia; // Compara el día del evento
+                        const seSolapa = startDate < event.end && endDate > event.start; // Verifica solapamiento en horas
+                        return mismoDia && seSolapa;
+                    });
+                }
 
-    for (let dia of diasDisponibles) {
-        var startDate = new Date();
-        startDate.setDate(startDate.getDate() + (dia - startDate.getDay()));
-        startDate.setHours(parseInt(horaInicio[0]), parseInt(horaInicio[1]), 0);
+                for (let dia of diasDisponibles) {
+                    // Ajustar la fecha para el día correspondiente de la semana
+                    var startDate = new Date();
+                    startDate.setDate(startDate.getDate() + (dia - startDate.getDay()));
+                    startDate.setHours(parseInt(horaInicio[0]), parseInt(horaInicio[1]), 0); // Asignar la hora de inicio
 
-        var endDate = new Date(startDate);
-        endDate.setHours(parseInt(horaFin[0]), parseInt(horaFin[1]), 0);
+                    var endDate = new Date(startDate); // Copia de la fecha de inicio
+                    endDate.setHours(parseInt(horaFin[0]), parseInt(horaFin[1]), 0); // Asignar la hora de fin
 
-        if (esValido(dia, startDate, endDate)) {
-            return { diaAsignado: dia, startDate, endDate };
-        }
-    }
+                    // Llamada a esValido incluyendo eventosExistentes
+                    if (esValido(dia, startDate, endDate, eventosExistentes)) {
+                        return { diaAsignado: dia, startDate, endDate };
+                    }
+                }
 
-    return null;
-}
+                // Si no se encuentra un día válido, devolver null
+                return null;
+            }
 
-// Algoritmo Genético para optimizar horarios
-function algoritmoGenetico(eventos) {
-    // Generar población inicial
-    function generarPoblacionInicial(numIndividuos) {
-        let poblacion = [];
-        for (let i = 0; i < numIndividuos; i++) {
-            // Crear individuos con horarios aleatorios
-            poblacion.push(generarHorarioAleatorio(eventos));
-        }
-        return poblacion;
-    }
+            // Algoritmo Genético para optimizar horarios
+            function algoritmoGenetico(eventos) {
+                // Generar población inicial
+                function generarPoblacionInicial(numIndividuos) {
+                    let poblacion = [];
+                    for (let i = 0; i < numIndividuos; i++) {
+                        // Crear individuos con horarios aleatorios
+                        poblacion.push(generarHorarioAleatorio(eventos));
+                    }
+                    return poblacion;
+                }
 
-    // Evaluar fitness
-    function evaluarFitness(individuo) {
-        // Penalizar horarios que no cumplen con las restricciones
-        return calcularPenalizacion(individuo);
-    }
+                // Evaluar fitness
+                function evaluarFitness(individuo) {
+                    // Penalizar horarios que no cumplen con las restricciones
+                    return calcularPenalizacion(individuo);
+                }
 
-    // Cruzar dos individuos
-    function cruzar(individuo1, individuo2) {
-        // Implementar cruce
-        return combinarHorarios(individuo1, individuo2);
-    }
+                // Cruzar dos individuos
+                function cruzar(individuo1, individuo2) {
+                    // Implementar cruce
+                    return combinarHorarios(individuo1, individuo2);
+                }
 
-    // Mutar un individuo
-    function mutar(individuo) {
-        // Implementar mutación
-        return alterarHorario(individuo);
-    }
+                // Mutar un individuo
+                function mutar(individuo) {
+                    // Implementar mutación
+                    return alterarHorario(individuo);
+                }
 
-    // Parámetros del algoritmo genético
-    let numGeneraciones = 100;
-    let poblacion = generarPoblacionInicial(100);
+                // Parámetros del algoritmo genético
+                let numGeneraciones = 100;
+                let poblacion = generarPoblacionInicial(100);
 
-    for (let generacion = 0; generacion < numGeneraciones; generacion++) {
-        poblacion = poblacion.map(ind => {
-            let fitness = evaluarFitness(ind);
-            return { individuo: ind, fitness };
-        }).sort((a, b) => a.fitness - b.fitness); // Ordenar por fitness
+                for (let generacion = 0; generacion < numGeneraciones; generacion++) {
+                    poblacion = poblacion.map(ind => {
+                        let fitness = evaluarFitness(ind);
+                        return { individuo: ind, fitness };
+                    }).sort((a, b) => a.fitness - b.fitness); // Ordenar por fitness
 
-        let nuevaPoblacion = [];
-        for (let i = 0; i < poblacion.length; i += 2) {
-            let padre1 = poblacion[i].individuo;
-            let padre2 = poblacion[i + 1].individuo;
-            let hijo1 = cruzar(padre1, padre2);
-            let hijo2 = cruzar(padre2, padre1);
-            nuevaPoblacion.push(mutar(hijo1), mutar(hijo2));
-        }
-        poblacion = nuevaPoblacion;
-    }
+                    let nuevaPoblacion = [];
+                    for (let i = 0; i < poblacion.length; i += 2) {
+                        let padre1 = poblacion[i].individuo;
+                        let padre2 = poblacion[i + 1].individuo;
+                        let hijo1 = cruzar(padre1, padre2);
+                        let hijo2 = cruzar(padre2, padre1);
+                        nuevaPoblacion.push(mutar(hijo1), mutar(hijo2));
+                    }
+                    poblacion = nuevaPoblacion;
+                }
 
-    return poblacion[0].individuo; // Mejor solución encontrada
-}
+                return poblacion[0].individuo; // Mejor solución encontrada
+            }
 
-var calendar = new FullCalendar.Calendar(calendarEl, {
-    initialView: 'timeGridWeek',
-    locale: 'es',
-    firstDay: 1,
-    hiddenDays: [0, 6], // Oculta Sábado y Domingo
-    editable: true,
-    events: [],
-    eventClick: function (info) {
-        // Abrir modal con la información del evento seleccionado
-        var selectedEvent = info.event;
-        document.getElementById('eventId').value = selectedEvent.id;
-        document.getElementById('professorName').value = selectedEvent.title;
-        document.getElementById('subjectName').value = selectedEvent.extendedProps.subject;
-        document.getElementById('classTime').value = selectedEvent.start.toTimeString().slice(0, 5) + ' - ' + selectedEvent.end.toTimeString().slice(0, 5);
-        document.getElementById('classDay').value = selectedEvent.extendedProps.day;
-        document.getElementById('professorType').value = selectedEvent.extendedProps.type;
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'timeGridWeek',
+                locale: 'es',
+                firstDay: 1,
+                hiddenDays: [0, 6], // Oculta Sábado y Domingo
+                editable: true,
+                events: [],
+                eventClick: function (info) {
+                    // Abrir modal con la información del evento seleccionado
+                    var selectedEvent = info.event;
+                    document.getElementById('eventId').value = selectedEvent.id;
+                    document.getElementById('professorName').value = selectedEvent.title;
+                    document.getElementById('subjectName').value = selectedEvent.extendedProps.subject;
+                    document.getElementById('classTime').value = selectedEvent.start.toTimeString().slice(0, 5) + ' - ' + selectedEvent.end.toTimeString().slice(0, 5);
+                    document.getElementById('classDay').value = selectedEvent.extendedProps.day;
+                    document.getElementById('professorType').value = selectedEvent.extendedProps.type;
 
-        // Mostrar modal
-        var editModal = new bootstrap.Modal(document.getElementById('editModal'));
-        editModal.show();
-    }
-});
-calendar.render();
-    
+                    // Mostrar modal
+                    var editModal = new bootstrap.Modal(document.getElementById('editModal'));
+                    editModal.show();
+                }
+            });
+            calendar.render();
+
             // Cargar datos desde JSON
             fetch('datos.json').then(response => response.json()).then(data => {
                 // Procesar primero los profesores de tiempo completo
@@ -207,7 +208,7 @@ calendar.render();
                 // Luego procesar los profesores de contrato
                 data.filter(event => event.tipoProfesor === "Contrato").forEach(addEvent);
             });
-    
+
             function addEvent(event) {
                 var profesor = event.profesor;
                 var materia = event.materia;
@@ -215,32 +216,32 @@ calendar.render();
                 var horario = event.horario.split('-');
                 var horaInicio = horario[0].trim().split(':');
                 var horaFin = horario[1].trim().split(':');
-            
+
                 // Generar ID único si no existe
                 if (!event.id) {
                     event.id = profesor + '-' + materia + '-' + diaSemana + '-' + Math.random().toString(36).substr(2, 9);
                 }
-            
+
                 if (profesorMaterias[profesor] >= 4) {
                     console.error('El profesor ya tiene 4 materias asignadas. Ignorando clase:', profesor);
                     return;
                 }
-            
+
                 profesorMaterias[profesor] = (profesorMaterias[profesor] || 0) + 1;
-            
+
                 // Asignar día y hora usando backtracking si no hay un día específico
                 if (diaSemana.toLowerCase() === 'n/a') {
                     var diasDisponibles = [1, 2, 3, 4, 5]; // Lunes a Viernes
                     var resultado = asignarDiaBacktracking(profesor, horaInicio, horaFin, diasDisponibles, calendar.getEvents());
-            
+
                     if (!resultado) {
                         console.error('No se pudo asignar un horario disponible para el profesor:', profesor);
                         return;
                     }
-            
+
                     diaSemana = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes'][resultado.diaAsignado - 1];
                 }
-            
+
                 // Crear el evento en el calendario
                 var diasMap = {
                     "lunes": 1, "martes": 2, "miércoles": 3, "jueves": 4, "viernes": 5
@@ -251,11 +252,11 @@ calendar.render();
                 endDate.setDate(endDate.getDate() + (diasMap[diaSemana.toLowerCase()] - endDate.getDay()));
                 startDate.setHours(parseInt(horaInicio[0]), parseInt(horaInicio[1]), 0);
                 endDate.setHours(parseInt(horaFin[0]), parseInt(horaFin[1]), 0);
-            
+
                 if (!professorColors[profesor]) {
                     professorColors[profesor] = getRandomColor();
                 }
-            
+
                 // Verificar si el evento ya existe para evitar duplicados
                 var existingEvent = calendar.getEventById(event.id);
                 if (!existingEvent) {
@@ -274,13 +275,12 @@ calendar.render();
                     });
                 }
             }
-            
 
             // Guardar cambios en el modal
             document.getElementById('saveChanges').addEventListener('click', function () {
                 var eventId = document.getElementById('eventId').value;
                 var selectedEvent = calendar.getEventById(eventId); // Recupera el evento existente por ID
-    
+
                 if (selectedEvent) {
                     var newTitle = document.getElementById('professorName').value;
                     var newSubject = document.getElementById('subjectName').value;
@@ -288,7 +288,7 @@ calendar.render();
                     var newStartTime = timeRange[0].trim().split(':');
                     var newEndTime = timeRange[1].trim().split(':');
                     var newDay = new Date(selectedEvent.start); // Cambiamos el día pero conservamos la referencia
-    
+
                     var dayMap = {
                         "lunes": 1,
                         "martes": 2,
@@ -296,62 +296,53 @@ calendar.render();
                         "jueves": 4,
                         "viernes": 5
                     };
-    
-                    var selectedDay = document.getElementById('classDay').value.toLowerCase();
-                    var newDayOfWeek = dayMap[selectedDay];
-                    var currentDayOfWeek = (newDay.getDay() + 6) % 7 + 1; // Normalizamos el valor del día
-    
-                    var dayDifference = newDayOfWeek - currentDayOfWeek;
-                    newDay.setDate(newDay.getDate() + dayDifference); // Ajustamos el nuevo día
-    
-                    newDay.setHours(newStartTime[0], newStartTime[1]);
-    
-                    var newEndDay = new Date(newDay);
-                    newEndDay.setHours(newEndTime[0], newEndTime[1]);
-    
-                    // Actualizamos las propiedades del evento en el calendario
+                    var diaSeleccionado = document.getElementById('classDay').value.toLowerCase();
+                    newDay.setDate(newDay.getDate() + (dayMap[diaSeleccionado] - newDay.getDay()));
+
                     selectedEvent.setProp('title', newTitle);
                     selectedEvent.setExtendedProp('subject', newSubject);
-                    selectedEvent.setStart(newDay);
-                    selectedEvent.setEnd(newEndDay);
-                    selectedEvent.setExtendedProp('day', selectedDay);
-                    selectedEvent.setExtendedProp('type', document.getElementById('professorType').value);
-    
-                    // Cambiar el color si el nombre del profesor cambia
-                    if (professorColors[newTitle] && professorColors[newTitle] !== selectedEvent.backgroundColor) {
-                        selectedEvent.setProp('backgroundColor', professorColors[newTitle]);
-                        selectedEvent.setProp('borderColor', professorColors[newTitle]);
-                    }
+                    selectedEvent.setExtendedProp('day', diaSeleccionado);
+                    selectedEvent.setStart(new Date(newDay.setHours(parseInt(newStartTime[0]), parseInt(newStartTime[1]), 0)));
+                    selectedEvent.setEnd(new Date(newDay.setHours(parseInt(newEndTime[0]), parseInt(newEndTime[1]), 0)));
+
+                    // Cerrar modal
+                    var editModal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
+                    editModal.hide();
                 }
-    
-                var modal = bootstrap.Modal.getInstance(document.getElementById('editModal'));
-                modal.hide();
             });
-    
-            // Generar PDF con los eventos
+
+            // Función para generar y descargar el PDF
             document.getElementById('downloadPdfBtn').addEventListener('click', function () {
+                var { jsPDF } = window.jspdf;
                 var doc = new jsPDF();
                 var events = calendar.getEvents().map(event => {
                     return {
                         Profesor: event.title,
                         Materia: event.extendedProps.subject,
-                        Día: event.extendedProps.day,
+                        Día: event.extendedProps.day, // Captura el día de la semana
                         Inicio: event.start.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        Fin: event.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                        Tipo: event.extendedProps.type
+                        Fin: event.end.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                     };
                 });
-    
-                var columns = ['Profesor', 'Materia', 'Día', 'Inicio', 'Fin', 'Tipo'];
-                var rows = events.map(e => [e.Profesor, e.Materia, e.Día, e.Inicio, e.Fin, e.Tipo]);
-    
-                doc.autoTable(columns, rows);
+
+                // Añadir el día como columna en la tabla
+                doc.autoTable({
+                    head: [['Profesor', 'Materia', 'Día', 'Inicio', 'Fin']],
+                    body: events.map(e => [e.Profesor, e.Materia, e.Día, e.Inicio, e.Fin]),
+                    margin: { top: 10 },
+                    styles: {
+                        fontSize: 10,
+                        cellPadding: 3
+                    }
+                });
+
                 doc.save('horarios.pdf');
             });
         });
-    </script>    
+    </script>
 
     <!-- Scripts de Bootstrap -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+
 </html>
